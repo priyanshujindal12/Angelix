@@ -15,6 +15,7 @@ export default function PhoneScreen() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [existingPhone, setExistingPhone] = useState<string | null>(null)
   const [phoneVerified, setPhoneVerified] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   // Load phone number from AsyncStorage on mount
   useEffect(() => {
     loadPhoneFromStorage()
@@ -46,79 +47,92 @@ export default function PhoneScreen() {
     }
   }
 
+  // Auto-format phone: prepend +91 if user enters 10 digits without country code
+  const formatPhone = (raw: string): string => {
+    const cleaned = raw.trim().replace(/\s+/g, '')
+    if (/^\d{10}$/.test(cleaned)) {
+      return `+91${cleaned}`
+    }
+    return cleaned
+  }
+
   const handleSendOtp = async () => {
-    if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter a phone number')
+    setErrorMsg('')
+    const rawPhone = phone.trim()
+
+    if (!rawPhone) {
+      setErrorMsg('Please enter a phone number')
+      return
+    }
+
+    const formattedPhone = formatPhone(rawPhone)
+
+    // Client-side validation: must start with + and have at least 10 digits
+    if (!/^\+\d{10,15}$/.test(formattedPhone)) {
+      setErrorMsg('Enter a valid number with country code (e.g. +911234567890)')
       return
     }
 
     setSendingOtp(true)
-    console.log('🔄 Attempting to send OTP...')
-    console.log('📱 Phone number:', phone)
 
     try {
-      console.log('🔑 Getting Clerk token...')
       const token = await getToken()
 
       if (!token) {
-        throw new Error('Unable to get authentication token. Please sign in again.')
+        setErrorMsg('Unable to get authentication token. Please sign in again.')
+        setSendingOtp(false)
+        return
       }
-
-      console.log('✅ Token received, calling API...')
-      console.log('🌐 API URL:', `${API_URL} /api/addnumber / send - otp`)
 
       const response = await fetch(`${API_URL}/api/addnumber/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          phone: phone.trim(),
+          phone: formattedPhone,
         }),
       })
 
-      console.log('📥 Response status:', response.status)
       const data = await response.json()
-      console.log('📦 Response data:', data)
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to send OTP')
+        setErrorMsg(data.message || 'Failed to send OTP')
+        setSendingOtp(false)
+        return
       }
 
-      console.log('✅ OTP sent successfully!')
       setOtpSent(true)
+      setErrorMsg('')
       Alert.alert('Success', data.message || 'OTP sent to your email. Please check your inbox.')
     } catch (error: any) {
-      console.error('❌ Send OTP error:', error)
-      console.error('Error details:', error.message)
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to send OTP. Please check your internet connection and try again.'
-      )
+      console.error('Send OTP error:', error)
+      setErrorMsg('Network error. Please check your connection and try again.')
     } finally {
       setSendingOtp(false)
-      console.log('🏁 Send OTP process completed')
     }
   }
 
   const handleVerifyOtp = async () => {
+    setErrorMsg('')
     if (!otp.trim()) {
-      Alert.alert('Error', 'Please enter the OTP')
+      setErrorMsg('Please enter the OTP')
       return
     }
 
     setVerifyingOtp(true)
     try {
       const token = await getToken()
+      const formattedPhone = formatPhone(phone.trim())
       const response = await fetch(`${API_URL}/api/addnumber/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          phone: phone.trim(),
+          phone: formattedPhone,
           otp: otp.trim(),
         }),
       })
@@ -126,19 +140,21 @@ export default function PhoneScreen() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to verify OTP')
+        setErrorMsg(data.message || 'Failed to verify OTP')
+        setVerifyingOtp(false)
+        return
       }
 
       // Save phone to AsyncStorage after successful verification
-      await savePhoneToStorage(phone.trim(), true)
-      setExistingPhone(phone.trim())
+      await savePhoneToStorage(formattedPhone, true)
+      setExistingPhone(formattedPhone)
       setPhoneVerified(true)
+      setErrorMsg('')
 
       Alert.alert('Success', data.message || 'Phone number verified successfully!', [
         {
           text: 'OK',
           onPress: () => {
-            // Reset OTP form  
             setOtp('')
             setOtpSent(false)
           },
@@ -146,7 +162,7 @@ export default function PhoneScreen() {
       ])
     } catch (error: any) {
       console.error('Verify OTP error:', error)
-      Alert.alert('Error', error.message || 'Failed to verify OTP. Please check your OTP and try again.')
+      setErrorMsg('Network error. Please check your connection and try again.')
     } finally {
       setVerifyingOtp(false)
     }
@@ -192,9 +208,9 @@ export default function PhoneScreen() {
                 <Ionicons name="call-outline" size={20} color="#9333EA" />
               </View>
               <TextInput
-                placeholder="Enter phone number (e.g., +91 1234567890)"
+                placeholder="Enter phone number (e.g., 9876543210)"
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(text) => { setPhone(text); setErrorMsg('') }}
                 keyboardType="phone-pad"
                 style={styles.input}
                 placeholderTextColor="#94A3B8"
@@ -204,6 +220,9 @@ export default function PhoneScreen() {
                 <Ionicons name="checkmark-circle" size={24} color="#10B981" />
               )}
             </View>
+            {errorMsg && !otpSent ? (
+              <Text style={styles.errorText}>{errorMsg}</Text>
+            ) : null}
 
             {/* OTP Input (if OTP sent) */}
             {otpSent && (
@@ -215,13 +234,16 @@ export default function PhoneScreen() {
                   <TextInput
                     placeholder="Enter 6-digit OTP"
                     value={otp}
-                    onChangeText={setOtp}
+                    onChangeText={(text) => { setOtp(text); setErrorMsg('') }}
                     keyboardType="number-pad"
                     maxLength={6}
                     style={styles.input}
                     placeholderTextColor="#94A3B8"
                   />
                 </View>
+                {errorMsg ? (
+                  <Text style={styles.errorText}>{errorMsg}</Text>
+                ) : null}
 
                 <Pressable onPress={handleResendOtp}>
                   <Text style={styles.resendText}>Change phone number</Text>
@@ -264,7 +286,7 @@ export default function PhoneScreen() {
                 <Text style={styles.infoText}>
                   {otpSent
                     ? 'We sent a 6-digit OTP to your registered email. Enter it above to verify your phone number.'
-                    : 'Your phone number helps emergency contacts reach you quickly and receive alerts.'}
+                    : 'Your phone number helps emergency contacts reach you quickly and receive alerts. You can enter just your 10-digit number — we\'ll add +91 automatically.'}
                 </Text>
               </View>
             </View>
@@ -365,6 +387,14 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: '#1E293B',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   resendText: {
     color: '#9333EA',

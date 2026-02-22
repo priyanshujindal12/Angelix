@@ -24,6 +24,7 @@ export default function EmergencyScreen() {
   const [contacts, setContacts] = useState<EmergencyContact[]>([])
   const [loading, setLoading] = useState(true)
   const [addingContact, setAddingContact] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const [nickname, setNickname] = useState('')
   const [email, setEmail] = useState('')
@@ -59,15 +60,17 @@ export default function EmergencyScreen() {
   }
 
   const handleAddContact = async () => {
+    setErrorMsg('')
+
     if (!nickname.trim() || !email.trim()) {
-      Alert.alert('Error', 'Please fill in both name and email')
+      setErrorMsg('Please fill in both name and email')
       return
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address')
+      setErrorMsg('Please enter a valid email address')
       return
     }
 
@@ -89,12 +92,15 @@ export default function EmergencyScreen() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to add contact')
+        setErrorMsg(data.message || 'Failed to add contact')
+        setAddingContact(false)
+        return
       }
 
       // Clear form
       setNickname('')
       setEmail('')
+      setErrorMsg('')
 
       // Refresh contacts list
       await fetchContacts()
@@ -102,7 +108,7 @@ export default function EmergencyScreen() {
       Alert.alert('Success', data.message || 'Emergency contact added successfully!')
     } catch (error: any) {
       console.error('Add contact error:', error)
-      Alert.alert('Error', error.message || 'Failed to add contact. Please try again.')
+      setErrorMsg('Network error. Please check your connection and try again.')
     } finally {
       setAddingContact(false)
     }
@@ -216,7 +222,7 @@ export default function EmergencyScreen() {
             <TextInput
               placeholder="Contact Name / Nickname"
               value={nickname}
-              onChangeText={setNickname}
+              onChangeText={(text) => { setNickname(text); setErrorMsg('') }}
               style={styles.input}
               placeholderTextColor="#94A3B8"
             />
@@ -230,13 +236,18 @@ export default function EmergencyScreen() {
             <TextInput
               placeholder="Email Address"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => { setEmail(text); setErrorMsg('') }}
               keyboardType="email-address"
               autoCapitalize="none"
               style={styles.input}
               placeholderTextColor="#94A3B8"
             />
           </View>
+
+          {/* Error message */}
+          {errorMsg ? (
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          ) : null}
 
           {/* Note */}
           <View style={styles.noteCard}>
@@ -412,6 +423,14 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: '#1E293B',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: -6,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   noteCard: {
     flexDirection: 'row',

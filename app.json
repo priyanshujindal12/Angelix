@@ -14,7 +14,7 @@
     "android": {
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+          "apiKey": "AIzaSyB6IK4gtfz-XGtTtz4qUjj7b3O8ohOeoNs"
         }
       },
       "adaptiveIcon": {
@@ -50,6 +50,13 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Angelix to use your location for safety tracking."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Angelix to access your camera for safety recording.",
+          "microphonePermission": "Allow Angelix to record audio during emergencies."
         }
       ]
     ],

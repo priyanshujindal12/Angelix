@@ -6,8 +6,7 @@ import * as Location from 'expo-location'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigation } from 'expo-router'
 
-import {
-  ActivityIndicator,
+import {ActivityIndicator,
   Animated,
   Image,
   Platform,
@@ -60,11 +59,6 @@ export default function Home() {
   const avatarUri =
     user?.imageUrl ||
     'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
-
-  /* ------------------------------------------------ */
-  /* FETCH ROUTE */
-  /* ------------------------------------------------ */
-
   const fetchRoute = async () => {
     if (!location || !destination) return
 
@@ -128,10 +122,6 @@ export default function Home() {
       setTripState('idle')
     }
   }
-
-  /* ------------------------------------------------ */
-  /* TRIP CONTROLS */
-  /* ------------------------------------------------ */
 
   const handleStart = () => {
     if (!location) return
@@ -208,11 +198,6 @@ export default function Home() {
 
     return R * c // meters
   }
-
-  /* ------------------------------------------------ */
-  /* LIVE LOCATION TRACKING */
-  /* ------------------------------------------------ */
-
   useEffect(() => {
     let subscription: Location.LocationSubscription
     let interval: ReturnType<typeof setInterval>
@@ -251,8 +236,6 @@ export default function Home() {
           }
         }
       )
-
-      // SEND LOCATION TO BACKEND EVERY 5 MINUTES
       interval = setInterval(async () => {
         if (!location) return
 
@@ -440,6 +423,7 @@ export default function Home() {
                 )}
                 {!locationLoading && !mapError && location && (
                   <MapView
+                    provider="google"
                     ref={mapRef}
                     style={{ flex: 1 }}
                     initialRegion={{
